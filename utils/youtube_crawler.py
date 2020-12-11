@@ -6,7 +6,7 @@ import random
 from x_path_constants import X_PATH_CONSTANTS
 from text_conversion import convert_text_to_num
 import pandas as pd
-from webdriver import webdriver
+from webdriver import WebDriver
 # from selenium import webdriver from selenium.webdriver.chrome.options import Options
 
 # import time
@@ -72,63 +72,42 @@ class youtube_crawler():
         self.__word_list=[]
         self.__df__=pd.DataFrame(columns=[CSV_COLS.URL,CSV_COLS.TITLE, CSV_COLS.DESCRIPTION, CSV_COLS.LIKES, CSV_COLS.DISLIKES, CSV_COLS.VIEWS, CSV_COLS.UPLOAD_DATE, CSV_COLS.DURATION, 
                                           CSV_COLS.NUM_COMMENTS, CSV_COLS.CHANNEL_NAME, CSV_COLS.CHANNEL_SUBS, CSV_COLS.URL, CSV_COLS.TRANSCRIPT])
-
-    def wait_for_element_to_load(self):
-        time.sleep(round(random.uniform(2,4), 3))
         
     #return a df with 2 cols: |timestamp|_|text| 
     def get_video_transcript(self, youtube_url):
-        on_page_driver = webdriver.Chrome()
+        on_page_driver = WebDriver()
         on_page_driver.get(youtube_url)
+        transcript=[]
+        time.sleep(4)
+        on_page_driver.click(CONSTANTS.SHOW_MORE)
+        on_page_driver.click(X_PATH_CONSTANTS.OPEN_OPTIONS_BUTTON)
+        on_page_driver.click(X_PATH_CONSTANTS.OPEN_TRANSCRIPT_BUTTON)
+        transcript = on_page_driver.get_multiple_elements(X_PATH_CONSTANTS.TRANSCRIPT)
         
+        likes = on_page_driver.get_element_text(CONSTANTS.NUMBER_LIKES)
+        dislikes = on_page_driver.get_element_text(CONSTANTS.NUMBER_DISLIKES)
+        views = on_page_driver.get_element_text(CONSTANTS.VIEWS)
+        upload_date = on_page_driver.get_element_text(CONSTANTS.UPLOAD_DATE)
+        title = on_page_driver.get_element_text(CONSTANTS.TITLE)
+        description = on_page_driver.get_element_text(CONSTANTS.DESC)
+        duration = on_page_driver.get_element_text(CONSTANTS.DURATION)
+        num_comments =on_page_driver.get_element_text(CONSTANTS.NUM_COMMENTS)
+        channel_name =on_page_driver.get_element_text(CONSTANTS.CHANNEL_NAME)
+        channel_subs =on_page_driver.get_element_text(CONSTANTS.CHANNEL_SUBS)
+        #timestamp = on_page_driver.get_element_text(X_PATH_CONSTANTS.TIMESTAMP)
         
-        self.wait_for_element_to_load()
-        
-        #data to put into df
+            
+        total_trans=[]
+        for e in transcript:
+            total_trans.append(e.text)
+        out_dict={CSV_COLS.URL:youtube_url, CSV_COLS.TITLE: title,CSV_COLS.DESCRIPTION:description,  CSV_COLS.LIKES:likes, CSV_COLS.DISLIKES:dislikes, CSV_COLS.VIEWS:views,
+                CSV_COLS.UPLOAD_DATE:upload_date, CSV_COLS.DURATION:duration, CSV_COLS.NUM_COMMENTS:num_comments, 
+                CSV_COLS.CHANNEL_NAME:channel_name, CSV_COLS.CHANNEL_SUBS:channel_subs, CSV_COLS.URL:youtube_url, CSV_COLS.TRANSCRIPT:total_trans}
+        on_page_driver.close()
+        self.__df__=self.__df__.append(out_dict, ignore_index=True)
+        self.__df__.to_html('temp.html')
+        self.__df__.to_csv('output.csv')
 
-        
-       
-        
-        self.wait_for_element_to_load()
-        self.wait_for_element_to_load()
-        on_page_driver.find_element_by_xpath(CONSTANTS.SHOW_MORE).click()
-        try:
-            likes = on_page_driver.find_element_by_xpath(CONSTANTS.NUMBER_LIKES).text
-            dislikes = on_page_driver.find_element_by_xpath(CONSTANTS.NUMBER_DISLIKES).text
-            views = on_page_driver.find_element_by_xpath(CONSTANTS.VIEWS).text
-            upload_date = on_page_driver.find_element_by_xpath(CONSTANTS.UPLOAD_DATE).text
-            title = on_page_driver.find_element_by_xpath(CONSTANTS.TITLE).text
-            description = on_page_driver.find_element_by_xpath(CONSTANTS.DESC).text
-            duration = on_page_driver.find_element_by_xpath(CONSTANTS.DURATION).text
-            num_comments =on_page_driver.find_element_by_xpath(CONSTANTS.NUM_COMMENTS).text
-            channel_name =on_page_driver.find_element_by_xpath(CONSTANTS.CHANNEL_NAME).text
-            channel_subs =on_page_driver.find_element_by_xpath(CONSTANTS.CHANNEL_SUBS).text
-            url=youtube_url
-            on_page_driver.find_element_by_xpath(X_PATH_CONSTANTS.OPEN_OPTIONS_BUTTON).click()
-            total_trans=[]
-            on_page_driver.find_element_by_xpath(X_PATH_CONSTANTS.OPEN_TRANSCRIPT_BUTTON).click()
-            self.wait_for_element_to_load()
-            self.wait_for_element_to_load()
-            transcript = on_page_driver.find_elements_by_xpath(X_PATH_CONSTANTS.TRANSCRIPT)
-            
-            # timestamp = on_page_driver.find_element_by_xpath(X_PATH_CONSTANTS.TIMESTAMP)
-          
-            for e in transcript:
-                total_trans.append(e.text)
-            on_page_driver.close()
-            
-            out_dict={CSV_COLS.URL:url, CSV_COLS.TITLE: title,CSV_COLS.DESCRIPTION:description,  CSV_COLS.LIKES:likes, CSV_COLS.DISLIKES:dislikes, CSV_COLS.VIEWS:views,
-                      CSV_COLS.UPLOAD_DATE:upload_date, CSV_COLS.DURATION:duration, CSV_COLS.NUM_COMMENTS:num_comments, 
-                      CSV_COLS.CHANNEL_NAME:channel_name, CSV_COLS.CHANNEL_SUBS:channel_subs, CSV_COLS.URL:url, CSV_COLS.TRANSCRIPT:total_trans}
-          
-            self.__df__=self.__df__.append(out_dict, ignore_index=True)
-            self.__df__.to_html('temp.html')
-            self.__df__.to_csv('output.csv')
-            return total_trans
-        except:
-            on_page_driver.close()
-            return
-    
     def get_list_of_videos_on_channel(self, youtube_url):
         driver = webdriver.Chrome()
         driver.get(youtube_url)
@@ -139,9 +118,10 @@ class youtube_crawler():
         for e in videos:
             a = e.get_attribute('href')
             if(a !=None and "redirect" not in a):
-                if("watch" in a ):
+                if("watch" in a and a not in list_of_videos):
                     list_of_videos.append(a)
         driver.close()
+       
         return list_of_videos
         
     def get_all_video_transcripts_from_channel(self, youtube_url):
@@ -150,15 +130,13 @@ class youtube_crawler():
         joined_list=[]
         for video_url in list_of_videos:
             try:
-                transcript=self.get_video_transcript(video_url)
-                joined_list.append(transcript)
+                self.get_video_transcript(video_url)
             except KeyboardInterrupt:
                 print("stopped due to keyboard interrupt")
                 with open("words.txt", "a") as output:
                     output.write(str(joined_list))
                 return
-            except:
-                continue
+
    
     def get_channel_sub_count(self, youtube_url):
         driver = webdriver.Chrome()
@@ -180,4 +158,4 @@ class youtube_crawler():
         return processed
 
 yt= youtube_crawler()
-t=yt.get_video_transcript("https://www.youtube.com/watch?v=IjpKzXKT8w4&t=378s")
+t=yt.get_all_video_transcripts_from_channel("https://www.youtube.com/user/777tjm/videos")
