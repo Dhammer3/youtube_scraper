@@ -158,4 +158,4 @@ class youtube_crawler():
         return processed
 
 yt= youtube_crawler()
-t=yt.get_all_video_transcripts_from_channel("https://www.youtube.com/user/777tjm/videos")
+t=yt.get_all_video_transcripts_from_channel("https://www.youtube.com/c/msnbc/videos")

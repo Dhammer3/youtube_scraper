@@ -1,11 +1,11 @@
 from selenium import webdriver
 from selenium.webdriver.common.keys import Keys
+
 import time
 
 class WebDriver:
     def __init__(self):
         self.driver =  webdriver.Chrome()
-        
     
     def get(self, url):
         self.driver.get(url)
@@ -52,7 +52,6 @@ class WebDriver:
             self.driver.find_element_by_xpath(elem).click()
         except:
             return
-  
     
     def close(self):
         self.driver.close()
