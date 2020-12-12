@@ -42,6 +42,7 @@ class CONSTANTS():
     CHANNEL_NAME="//yt-formatted-string[@id='text']/a[@class='yt-simple-endpoint style-scope yt-formatted-string' and 1]"
     CHANNEL_SUBS="//yt-formatted-string[@id='owner-sub-count']"
     SHOW_MORE="//yt-formatted-string[@class='more-button style-scope ytd-video-secondary-info-renderer']"
+    SKIP_ADD_BUTTON="/html/body/div[2]/div[2]/div[2]/div/div[3]/form/div/input"
    
 class wait_for_page_load(object):
   def __init__(self, browser):
@@ -78,7 +79,9 @@ class youtube_crawler():
         on_page_driver = WebDriver()
         on_page_driver.get(youtube_url)
         transcript=[]
-        time.sleep(4)
+        time.sleep(5)
+        on_page_driver.click(CONSTANTS.SKIP_ADD_BUTTON)
+        time.sleep(2)
         on_page_driver.click(CONSTANTS.SHOW_MORE)
         on_page_driver.click(X_PATH_CONSTANTS.OPEN_OPTIONS_BUTTON)
         on_page_driver.click(X_PATH_CONSTANTS.OPEN_TRANSCRIPT_BUTTON)
