@@ -95,23 +95,23 @@ class youtube_crawler():
                 return False
         return True    
 
-
+    #@TODO implement
+    # def video_is_correct_length(video_len_str)
 
     def get_recent_video_links(self, driver):
         videos = driver.find_elements_by_id('video-title')
         list_of_videos ={'links':[],'upload_times':[]}
         for e in videos:
-            a = e.get_attribute('href')
 
+            link = e.get_attribute('href')
             label= e.get_attribute('aria-label')
             upload_time =re.findall(r"[\d]+[\s][\w]+\b ago\b",label)
-            if self.upload_time_is_recent(upload_time):
-                list_of_videos['links'].append(a)
+
+            if self.upload_time_is_recent(upload_time) :
+                list_of_videos['links'].append(link)
                 list_of_videos['upload_times'].append(upload_time[0])
-
+        driver.close()
         return list_of_videos
-
-
 
     def get_video_transcript(self, youtube_url):
         on_page_driver = WebDriver()
@@ -198,15 +198,7 @@ class youtube_crawler():
         driver = webdriver.Chrome()
         driver.get(url)
         scroll_to_bottom(driver)
+        dict= self.get_recent_video_links(driver)
+        driver.close()
+        return dict
         
-        # blocks=driver.find_elements_by_xpath("//ytd-two-column-search-results-renderer/div[@id='primary' and @class='style-scope ytd-two-column-search-results-renderer' and 1]/ytd-section-list-renderer[@class='style-scope ytd-two-column-search-results-renderer' and 1]/div[@id='contents' and @class='style-scope ytd-section-list-renderer' and 2]/ytd-item-section-renderer[@class='style-scope ytd-section-list-renderer' and 4]/div[@id='contents' and @class='style-scope ytd-item-section-renderer' and 3]/ytd-video-renderer[@class='style-scope ytd-item-section-renderer' and 1]/div[@id='dismissable' and @class='style-scope ytd-video-renderer' and 1]/div[@class='text-wrapper style-scope ytd-video-renderer' and 1]")
-        # for block in blocks:
-        #     print(block.text)
-
-        # driver.close()
-        return self.get_recent_video_links(driver)
-        
-
-yt= youtube_crawler()
-t=yt.get_recent_videos_from_query('earthquakes')
-print(t)
