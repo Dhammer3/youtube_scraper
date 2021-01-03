@@ -79,5 +79,7 @@ class WebDriver:
                     " window.pageYOffset : (document.documentElement ||"
                     " document.body.parentNode || document.body);"))
             num_scrolls+=1
+    def find_elements_by_tag_name(self, tag_name):
+        return self.driver.find_elements_by_tag_name(tag_name)
 
 

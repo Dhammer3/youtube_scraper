@@ -1,12 +1,14 @@
 from selenium import webdriver
 from selenium.webdriver.common.keys import Keys
 import time
-from selenium_utils import scroll_to_bottom
+from selenium_utils import scroll_to_bottom, scroll_to_one_year
 import random
 from x_path_constants import X_PATH_CONSTANTS
 from text_conversion import convert_text_to_num
 import pandas as pd
 from webdriver import WebDriver
+import re
+
 # from selenium import webdriver from selenium.webdriver.chrome.options import Options
 
 # import time
@@ -73,8 +75,44 @@ class youtube_crawler():
         self.__word_list=[]
         self.__df__=pd.DataFrame(columns=[CSV_COLS.URL,CSV_COLS.TITLE, CSV_COLS.DESCRIPTION, CSV_COLS.LIKES, CSV_COLS.DISLIKES, CSV_COLS.VIEWS, CSV_COLS.UPLOAD_DATE, CSV_COLS.DURATION, 
                                           CSV_COLS.NUM_COMMENTS, CSV_COLS.CHANNEL_NAME, CSV_COLS.CHANNEL_SUBS, CSV_COLS.URL, CSV_COLS.TRANSCRIPT])
-        
-    #return a df with 2 cols: |timestamp|_|text| 
+    def get_video_links(self, driver):
+        videos = driver.find_elements_by_tag_name('a')
+        list_of_videos =[]
+        for e in videos:
+            a = e.get_attribute('href')
+            if(a !=None and "redirect" not in a):
+                if("watch" in a and a not in list_of_videos):
+                    list_of_videos.append(a)
+        return list_of_videos
+
+    def upload_time_is_recent(self, upload_time):
+        if upload_time == []:
+            return False
+        upload_time=upload_time[0]
+        unacceptable_measures=['month','year','months','years']
+        for measure in unacceptable_measures:
+            if measure in upload_time:
+                return False
+        return True    
+
+
+
+    def get_recent_video_links(self, driver):
+        videos = driver.find_elements_by_id('video-title')
+        list_of_videos ={'links':[],'upload_times':[]}
+        for e in videos:
+            a = e.get_attribute('href')
+
+            label= e.get_attribute('aria-label')
+            upload_time =re.findall(r"[\d]+[\s][\w]+\b ago\b",label)
+            if self.upload_time_is_recent(upload_time):
+                list_of_videos['links'].append(a)
+                list_of_videos['upload_times'].append(upload_time[0])
+
+        return list_of_videos
+
+
+
     def get_video_transcript(self, youtube_url):
         on_page_driver = WebDriver()
         on_page_driver.get(youtube_url)
@@ -118,11 +156,7 @@ class youtube_crawler():
         time.sleep(4)
         videos = driver.find_elements_by_tag_name('a')
         list_of_videos =[]
-        for e in videos:
-            a = e.get_attribute('href')
-            if(a !=None and "redirect" not in a):
-                if("watch" in a and a not in list_of_videos):
-                    list_of_videos.append(a)
+        list_of_videos=self.get_video_links(driver)
         driver.close()
        
         return list_of_videos
@@ -140,7 +174,6 @@ class youtube_crawler():
                     output.write(str(joined_list))
                 return
 
-   
     def get_channel_sub_count(self, youtube_url):
         driver = webdriver.Chrome()
         driver.get(youtube_url)
@@ -160,5 +193,20 @@ class youtube_crawler():
         driver.close()
         return processed
 
+    def get_recent_videos_from_query(self, query):
+        url = f"https://www.youtube.com/results?search_query={query}&sp=CAI%253D"
+        driver = webdriver.Chrome()
+        driver.get(url)
+        scroll_to_bottom(driver)
+        
+        # blocks=driver.find_elements_by_xpath("//ytd-two-column-search-results-renderer/div[@id='primary' and @class='style-scope ytd-two-column-search-results-renderer' and 1]/ytd-section-list-renderer[@class='style-scope ytd-two-column-search-results-renderer' and 1]/div[@id='contents' and @class='style-scope ytd-section-list-renderer' and 2]/ytd-item-section-renderer[@class='style-scope ytd-section-list-renderer' and 4]/div[@id='contents' and @class='style-scope ytd-item-section-renderer' and 3]/ytd-video-renderer[@class='style-scope ytd-item-section-renderer' and 1]/div[@id='dismissable' and @class='style-scope ytd-video-renderer' and 1]/div[@class='text-wrapper style-scope ytd-video-renderer' and 1]")
+        # for block in blocks:
+        #     print(block.text)
+
+        # driver.close()
+        return self.get_recent_video_links(driver)
+        
+
 yt= youtube_crawler()
-t=yt.get_all_video_transcripts_from_channel("https://www.youtube.com/c/msnbc/videos")
+t=yt.get_recent_videos_from_query('earthquakes')
+print(t)
