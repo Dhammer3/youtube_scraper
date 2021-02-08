@@ -18,7 +18,7 @@ class WebDriver():
         try:
             return self.driver.find_element_by_xpath(elem)
         except:
-            return 'None'
+            return {'text':'None'}
     
     def get_multiple_elements(self, elem):
         self.wait_for_elem_load(elem)
@@ -42,7 +42,7 @@ class WebDriver():
         try:
             return elem.text
         except:
-            return {'text':'None'}
+            return 'None'
     
     def click(self, *args):
         for elem in args:
@@ -183,6 +183,15 @@ class youtube_crawler(WebDriver):
             total_trans.append(e.text)
         return total_trans
 
+    def append_df(self, out_dict):
+        self.__df__=self.__df__.append(out_dict, ignore_index=True)
+
+    def make_csv(self):
+        self.__df__.to_csv('output.csv')
+    
+    def make_html(self, out_dict):
+        self.__df__.to_html('temp.html')
+        
     def get_video_transcript(self, youtube_url):
         self.driver.get(youtube_url)
         self.driver.click(
@@ -193,6 +202,7 @@ class youtube_crawler(WebDriver):
         
         transcript = self.driver.get_multiple_elements(X_PATH_CONSTANTS.TRANSCRIPT)
         transcript = self.process_transcript(transcript)
+        
         likes = self.driver.get_element_text(CONSTANTS.NUMBER_LIKES)
         dislikes = self.driver.get_element_text(CONSTANTS.NUMBER_DISLIKES)
         views = self.driver.get_element_text(CONSTANTS.VIEWS)
@@ -208,15 +218,14 @@ class youtube_crawler(WebDriver):
         out_dict={CSV_COLS.URL:youtube_url, CSV_COLS.TITLE: title,CSV_COLS.DESCRIPTION:description,  CSV_COLS.LIKES:likes, CSV_COLS.DISLIKES:dislikes, CSV_COLS.VIEWS:views,
                 CSV_COLS.UPLOAD_DATE:upload_date, CSV_COLS.DURATION:duration, CSV_COLS.NUM_COMMENTS:num_comments, 
                 CSV_COLS.CHANNEL_NAME:channel_name, CSV_COLS.CHANNEL_SUBS:channel_subs, CSV_COLS.URL:youtube_url, CSV_COLS.TRANSCRIPT:total_trans}
-        self.__df__=self.__df__.append(out_dict, ignore_index=True)
-        self.__df__.to_html('temp.html')
-        self.__df__.to_csv('output.csv')
+        
+        self.append_df(out_dict)
+        self.make_csv()
 
     def get_list_of_videos_on_channel(self, youtube_url):
         self.driver.get(youtube_url)
         self.driver.scroll()
-        time.sleep(4)
-        videos = driver.find_elements_by_tag_name('a')
+        videos = self.driver.find_elements_by_tag_name('a')
         list_of_videos =[]
         list_of_videos=self.get_video_links(driver)
         return list_of_videos
@@ -240,7 +249,6 @@ class youtube_crawler(WebDriver):
 
     def get_video_view_count(self, youtube_url):
         self.driver.get(youtube_url)
-        time.sleep(2)
         views = self.driver.find_element_by_xpath(CONSTANTS.VIEWS)
         processed= views.text
         processed = processed.replace('views', '')
@@ -253,6 +261,3 @@ class youtube_crawler(WebDriver):
         dict= self.get_recent_video_links(self.driver)
         return dict
         
-yt= youtube_crawler(WebDriver(webdriver))
-yt.get_video_transcript('https://www.youtube.com/watch?v=zv5UvtkZi10')
-del yt
