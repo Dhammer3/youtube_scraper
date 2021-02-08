@@ -1,23 +1,97 @@
+#!/usr/bin/env python3
 from selenium import webdriver
 from selenium.webdriver.common.keys import Keys
 import time
-from selenium_utils import scroll_to_bottom, scroll_to_one_year
-import random
-from x_path_constants import X_PATH_CONSTANTS
-from text_conversion import convert_text_to_num
 import pandas as pd
-from webdriver import WebDriver
-import re
+class WebDriver():
+    def __init__(self, webdriver):
+        self.driver =  webdriver.Firefox()
+    
+    def __del__(self):
+        self.driver.close()
 
-# from selenium import webdriver from selenium.webdriver.chrome.options import Options
+    def get(self, url):
+        self.driver.get(url)
+    
+    def get_element(self, elem):
+        self.wait_for_elem_load(elem)
+        try:
+            return self.driver.find_element_by_xpath(elem)
+        except:
+            return 'None'
+    
+    def get_multiple_elements(self, elem):
+        self.wait_for_elem_load(elem)
+        return self.driver.find_elements_by_xpath(elem)
+    
+    def wait_for_elem_load(self, elem):
+        loaded = False
+        counter= 0
+        while not loaded:
+            try:
+                self.driver.find_element_by_xpath(elem)
+                loaded= True
+            except:
+                time.sleep(0.1)
+            counter+=1
+            if(counter > 50):
+               break
+    
+    def get_element_text(self, elem):
+        elem = self.get_element(elem)
+        try:
+            return elem.text
+        except:
+            return {'text':'None'}
+    
+    def click(self, *args):
+        for elem in args:
+            self.wait_for_elem_load(elem)
+            time.sleep(0.1)
+            try:
+                self.driver.find_element_by_xpath(elem).click()
+            except:
+                pass
+    
+    def close(self):
+        self.driver.close()
+        
+    def scroll(self, max_num_scrolls=5):
+        old_position = 0
+        new_position = None
+        num_scrolls=0
+        while new_position != old_position:
+            # Get old scroll position
+            old_position = self.driver.execute_script(
+                    ("return (window.pageYOffset !== undefined) ?"
+                    " window.pageYOffset : (document.documentElement ||"
+                    " document.body.parentNode || document.body);"))
+            # Sleep and Scroll
+            time.sleep(1.2)
+            self.driver.execute_script((
+                    "var scrollingElement = (document.scrollingElement ||"
+                    " document.body);scrollingElement.scrollTop ="
+                    " scrollingElement.scrollHeight;"))
+            # Get new position
+            new_position = self.driver.execute_script(
+                    ("return (window.pageYOffset !== undefined) ?"
+                    " window.pageYOffset : (document.documentElement ||"
+                    " document.body.parentNode || document.body);"))
+            num_scrolls+=1
+            if num_scrolls==max_num_scrolls:
+                break
+    
+    def find_elements_by_tag_name(self, tag_name):
+        return self.driver.find_elements_by_tag_name(tag_name)
 
-# import time
-# chrome_options = Options()
-# #chrome_options.add_argument("--disable-extensions")
-# #chrome_options.add_argument("--disable-gpu")
-# #chrome_options.add_argument("--no-sandbox") # linux only
-# chrome_options.add_argument("--headless")
+    def find_element_by_xpath(self, xpath):
+        return self.driver.find_element_by_xpath(xpath)
 
+class X_PATH_CONSTANTS():
+    TIMESTAMP="//div[@class='cue-group style-scope ytd-transcript-body-renderer']/div[@class='cue-group-start-offset style-scope ytd-transcript-body-renderer' and 1]"
+    TRANSCRIPT ="//div[@class='cue style-scope ytd-transcript-body-renderer']"
+    OPEN_TRANSCRIPT_BUTTON="//yt-formatted-string[@class='style-scope ytd-menu-service-item-renderer']"
+    OPEN_OPTIONS_BUTTON ="//ytd-menu-renderer[@class='style-scope ytd-video-primary-info-renderer']/yt-icon-button[@id='button' and @class='dropdown-trigger style-scope ytd-menu-renderer' and 1]/button[@id='button' and @class='style-scope yt-icon-button' and 1]/yt-icon[@class='style-scope ytd-menu-renderer' and 1]"
 class CSV_COLS():
     LIKES="LIKES"
     DISLIKES="DISLIKES"
@@ -45,19 +119,9 @@ class CONSTANTS():
     CHANNEL_SUBS="//yt-formatted-string[@id='owner-sub-count']"
     SHOW_MORE="//yt-formatted-string[@class='more-button style-scope ytd-video-secondary-info-renderer']"
     SKIP_ADD_BUTTON="/html/body/div[2]/div[2]/div[2]/div/div[3]/form/div/input"
-   
-class wait_for_page_load(object):
-  def __init__(self, browser):
-    self.browser = browser
-  def __enter__(self):
-    self.old_page = self.browser.find_element_by_tag_name('html')
-  def page_has_loaded(self):
-    new_page = self.browser.find_element_by_tag_name('html')
-    return new_page.id != self.old_page.id
-  def __exit__(self, *_):
-    wait_for(self.page_has_loaded)
+    SUBSCRIBERS ="//yt-formatted-string[@id='subscriber-count']"
 
-class youtube_crawler():
+class youtube_crawler(WebDriver):
     LIKES="LIKES"
     DISLIKES="DISLIKES"
     VIEWS="VIEWS"
@@ -71,12 +135,18 @@ class youtube_crawler():
     CHANNEL_NAME="CHANNEL_NAME"
     TRANSCRIPT="TRANSCRIPT"
 
-    def __init__(self):
+    def __init__(self, webdriver):
         self.__word_list=[]
         self.__df__=pd.DataFrame(columns=[CSV_COLS.URL,CSV_COLS.TITLE, CSV_COLS.DESCRIPTION, CSV_COLS.LIKES, CSV_COLS.DISLIKES, CSV_COLS.VIEWS, CSV_COLS.UPLOAD_DATE, CSV_COLS.DURATION, 
                                           CSV_COLS.NUM_COMMENTS, CSV_COLS.CHANNEL_NAME, CSV_COLS.CHANNEL_SUBS, CSV_COLS.URL, CSV_COLS.TRANSCRIPT])
+        
+        self.driver=webdriver
+
+    def __del__(self):
+        self.driver.close()
+
     def get_video_links(self, driver):
-        videos = driver.find_elements_by_tag_name('a')
+        videos = self.driver.find_elements_by_tag_name('a')
         list_of_videos =[]
         for e in videos:
             a = e.get_attribute('href')
@@ -95,75 +165,64 @@ class youtube_crawler():
                 return False
         return True    
 
-    #@TODO implement
-    # def video_is_correct_length(video_len_str)
-
     def get_recent_video_links(self, driver):
-        videos = driver.find_elements_by_id('video-title')
+        videos = self.driver.find_elements_by_id('video-title')
         list_of_videos ={'links':[],'upload_times':[]}
         for e in videos:
-
             link = e.get_attribute('href')
             label= e.get_attribute('aria-label')
             upload_time =re.findall(r"[\d]+[\s][\w]+\b ago\b",label)
-
             if self.upload_time_is_recent(upload_time) :
                 list_of_videos['links'].append(link)
                 list_of_videos['upload_times'].append(upload_time[0])
-        driver.close()
         return list_of_videos
 
-    def get_video_transcript(self, youtube_url):
-        on_page_driver = WebDriver()
-        on_page_driver.get(youtube_url)
-        transcript=[]
-        time.sleep(5)
-        on_page_driver.click(CONSTANTS.SKIP_ADD_BUTTON)
-        time.sleep(2)
-        on_page_driver.click(CONSTANTS.SHOW_MORE)
-        on_page_driver.click(X_PATH_CONSTANTS.OPEN_OPTIONS_BUTTON)
-        on_page_driver.click(X_PATH_CONSTANTS.OPEN_TRANSCRIPT_BUTTON)
-        transcript = on_page_driver.get_multiple_elements(X_PATH_CONSTANTS.TRANSCRIPT)
-        
-        likes = on_page_driver.get_element_text(CONSTANTS.NUMBER_LIKES)
-        dislikes = on_page_driver.get_element_text(CONSTANTS.NUMBER_DISLIKES)
-        views = on_page_driver.get_element_text(CONSTANTS.VIEWS)
-        upload_date = on_page_driver.get_element_text(CONSTANTS.UPLOAD_DATE)
-        title = on_page_driver.get_element_text(CONSTANTS.TITLE)
-        description = on_page_driver.get_element_text(CONSTANTS.DESC)
-        duration = on_page_driver.get_element_text(CONSTANTS.DURATION)
-        num_comments =on_page_driver.get_element_text(CONSTANTS.NUM_COMMENTS)
-        channel_name =on_page_driver.get_element_text(CONSTANTS.CHANNEL_NAME)
-        channel_subs =on_page_driver.get_element_text(CONSTANTS.CHANNEL_SUBS)
-        #timestamp = on_page_driver.get_element_text(X_PATH_CONSTANTS.TIMESTAMP)
-        
-            
+    def process_transcript(self, transcript):
         total_trans=[]
         for e in transcript:
             total_trans.append(e.text)
+        return total_trans
+
+    def get_video_transcript(self, youtube_url):
+        self.driver.get(youtube_url)
+        self.driver.click(
+        CONSTANTS.SKIP_ADD_BUTTON,
+        CONSTANTS.SHOW_MORE,
+        X_PATH_CONSTANTS.OPEN_OPTIONS_BUTTON,
+        X_PATH_CONSTANTS.OPEN_TRANSCRIPT_BUTTON)
+        
+        transcript = self.driver.get_multiple_elements(X_PATH_CONSTANTS.TRANSCRIPT)
+        transcript = self.process_transcript(transcript)
+        likes = self.driver.get_element_text(CONSTANTS.NUMBER_LIKES)
+        dislikes = self.driver.get_element_text(CONSTANTS.NUMBER_DISLIKES)
+        views = self.driver.get_element_text(CONSTANTS.VIEWS)
+        upload_date = self.driver.get_element_text(CONSTANTS.UPLOAD_DATE)
+        title = self.driver.get_element_text(CONSTANTS.TITLE)
+        description = self.driver.get_element_text(CONSTANTS.DESC)
+        duration = self.driver.get_element_text(CONSTANTS.DURATION)
+        num_comments =self.driver.get_element_text(CONSTANTS.NUM_COMMENTS)
+        channel_name =self.driver.get_element_text(CONSTANTS.CHANNEL_NAME)
+        channel_subs =self.driver.get_element_text(CONSTANTS.CHANNEL_SUBS)
+        #timestamp = self.driver.get_element_text(X_PATH_CONSTANTS.TIMESTAMP)
+        
         out_dict={CSV_COLS.URL:youtube_url, CSV_COLS.TITLE: title,CSV_COLS.DESCRIPTION:description,  CSV_COLS.LIKES:likes, CSV_COLS.DISLIKES:dislikes, CSV_COLS.VIEWS:views,
                 CSV_COLS.UPLOAD_DATE:upload_date, CSV_COLS.DURATION:duration, CSV_COLS.NUM_COMMENTS:num_comments, 
                 CSV_COLS.CHANNEL_NAME:channel_name, CSV_COLS.CHANNEL_SUBS:channel_subs, CSV_COLS.URL:youtube_url, CSV_COLS.TRANSCRIPT:total_trans}
-        on_page_driver.close()
         self.__df__=self.__df__.append(out_dict, ignore_index=True)
         self.__df__.to_html('temp.html')
         self.__df__.to_csv('output.csv')
 
     def get_list_of_videos_on_channel(self, youtube_url):
-        driver = webdriver.Chrome()
-        driver.get(youtube_url)
-        scroll_to_bottom(driver)
+        self.driver.get(youtube_url)
+        self.driver.scroll()
         time.sleep(4)
         videos = driver.find_elements_by_tag_name('a')
         list_of_videos =[]
         list_of_videos=self.get_video_links(driver)
-        driver.close()
-       
         return list_of_videos
         
     def get_all_video_transcripts_from_channel(self, youtube_url):
         list_of_videos=self.get_list_of_videos_on_channel(youtube_url)
-        
         joined_list=[]
         for video_url in list_of_videos:
             try:
@@ -175,30 +234,25 @@ class youtube_crawler():
                 return
 
     def get_channel_sub_count(self, youtube_url):
-        driver = webdriver.Chrome()
-        driver.get(youtube_url)
-        subs = driver.find_element_by_xpath("//yt-formatted-string[@id='subscriber-count']")
-        subs = convert_text_to_num(subs)
-        (subs)
-        driver.close()
+        self.driver.get(youtube_url)
+        subs = self.driver.find_element_by_xpath(CONSTANTS.SUBSCRIBERS)
         return subs
 
     def get_video_view_count(self, youtube_url):
-        driver = webdriver.Chrome()
-        driver.get(youtube_url)
+        self.driver.get(youtube_url)
         time.sleep(2)
-        views = driver.find_element_by_xpath("//span[@class='view-count style-scope yt-view-count-renderer']")
+        views = self.driver.find_element_by_xpath(CONSTANTS.VIEWS)
         processed= views.text
         processed = processed.replace('views', '')
-        driver.close()
         return processed
 
     def get_recent_videos_from_query(self, query):
         url = f"https://www.youtube.com/results?search_query={query}&sp=CAI%253D"
-        driver = webdriver.Chrome()
-        driver.get(url)
-        scroll_to_bottom(driver)
-        dict= self.get_recent_video_links(driver)
-        driver.close()
+        self.driver.get(url)
+        self.driver.scroll()
+        dict= self.get_recent_video_links(self.driver)
         return dict
         
+yt= youtube_crawler(WebDriver(webdriver))
+yt.get_video_transcript('https://www.youtube.com/watch?v=zv5UvtkZi10')
+del yt

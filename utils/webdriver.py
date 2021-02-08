@@ -1,21 +1,21 @@
 from selenium import webdriver
-from selenium.webdriver.common.keys import Keys
 
 import time
 
 class WebDriver:
     def __init__(self):
-        self.driver =  webdriver.Chrome()
+        self.driver =  webdriver.Firefox()
     
     def get(self, url):
         self.driver.get(url)
     
-    def get_element(self, elem):
-        self.wait_for_elem_load(elem)
-        try:
-            return self.driver.find_element_by_xpath(elem)
-        except:
-            return 'None'
+    def get_element(self, *args):
+        for elem in args:
+            self.wait_for_elem_load(elem)
+            try:
+                return self.driver.find_element_by_xpath(elem)
+            except:
+                return 'None'
     
     def wait_for_elem_load(self, elem):
         loaded = False
@@ -24,13 +24,9 @@ class WebDriver:
             try:
                 self.driver.find_element_by_xpath(elem)
                 loaded= True
-                print("element is loaded")
             except:
-                time.sleep(0.2)
-                print("element not loaded")
-                
+                time.sleep(0.1)
             counter+=1
-            
             if(counter > 50):
                break
     
@@ -40,26 +36,22 @@ class WebDriver:
             return elem.text
         except:
             return "None"
-
-    def get_multiple_elements(self, elem):
-        self.wait_for_elem_load(elem)
-        return self.driver.find_elements_by_xpath(elem)
     
-    def click(self, elem):
-        self.wait_for_elem_load(elem)
-        time.sleep(0.2)
-        try:
-            self.driver.find_element_by_xpath(elem).click()
-        except:
-            return
+    def click(self, *args):
+        for elem in args:
+            self.wait_for_elem_load(elem)
+            time.sleep(0.1)
+            try:
+                self.driver.find_element_by_xpath(elem).click()
+            except:
+                return
     
     def close(self):
         self.driver.close()
         
-    def scroll_to_bottom(self):
+    def scroll(self, max_num_scrolls=5):
         old_position = 0
         new_position = None
-        MAX_NUM_SCROLLS=5
         num_scrolls=0
         while new_position != old_position:
             # Get old scroll position
@@ -79,7 +71,11 @@ class WebDriver:
                     " window.pageYOffset : (document.documentElement ||"
                     " document.body.parentNode || document.body);"))
             num_scrolls+=1
+            if num_scrolls==max_num_scrolls:
+                break
+    
     def find_elements_by_tag_name(self, tag_name):
         return self.driver.find_elements_by_tag_name(tag_name)
 
-
+    def find_element_by_xpath(self, xpath):
+        return self.driver.find_element_by_xpath(xpath)
