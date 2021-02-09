@@ -4,7 +4,7 @@ from selenium.webdriver.common.keys import Keys
 import time
 import pandas as pd
 class WebDriver():
-    def __init__(self, webdriver):
+    def __init__(self):
         self.driver =  webdriver.Firefox()
     
     def __del__(self):
@@ -32,9 +32,12 @@ class WebDriver():
                 self.driver.find_element_by_xpath(elem)
                 loaded= True
             except:
+                #the element is not on the page yet
                 time.sleep(0.1)
+                #the element may be lazy loaded in, so we scroll to trigger it.
+                self.single_scroll()
             counter+=1
-            if(counter > 50):
+            if(counter > 50): 
                break
     
     def get_element_text(self, elem):
@@ -55,6 +58,18 @@ class WebDriver():
     
     def close(self):
         self.driver.close()
+    
+    def get_screen_position(self):
+        return self.driver.execute_script(
+                    ("return (window.pageYOffset !== undefined) ?"
+                    " window.pageYOffset : (document.documentElement ||"
+                    " document.body.parentNode || document.body);"))
+    
+    def single_scroll(self):
+        self.driver.execute_script((
+        "var scrollingElement = (document.scrollingElement ||"
+        " document.body);scrollingElement.scrollTop ="
+        " scrollingElement.scrollHeight;"))
         
     def scroll(self, max_num_scrolls=5):
         old_position = 0
@@ -62,21 +77,12 @@ class WebDriver():
         num_scrolls=0
         while new_position != old_position:
             # Get old scroll position
-            old_position = self.driver.execute_script(
-                    ("return (window.pageYOffset !== undefined) ?"
-                    " window.pageYOffset : (document.documentElement ||"
-                    " document.body.parentNode || document.body);"))
+            old_position = self.get_screen_position()
             # Sleep and Scroll
             time.sleep(1.2)
-            self.driver.execute_script((
-                    "var scrollingElement = (document.scrollingElement ||"
-                    " document.body);scrollingElement.scrollTop ="
-                    " scrollingElement.scrollHeight;"))
+            self.single_scroll()
             # Get new position
-            new_position = self.driver.execute_script(
-                    ("return (window.pageYOffset !== undefined) ?"
-                    " window.pageYOffset : (document.documentElement ||"
-                    " document.body.parentNode || document.body);"))
+            new_position = self.get_screen_position()
             num_scrolls+=1
             if num_scrolls==max_num_scrolls:
                 break
@@ -88,10 +94,16 @@ class WebDriver():
         return self.driver.find_element_by_xpath(xpath)
 
 class X_PATH_CONSTANTS():
-    TIMESTAMP="//div[@class='cue-group style-scope ytd-transcript-body-renderer']/div[@class='cue-group-start-offset style-scope ytd-transcript-body-renderer' and 1]"
-    TRANSCRIPT ="//div[@class='cue style-scope ytd-transcript-body-renderer']"
-    OPEN_TRANSCRIPT_BUTTON="//yt-formatted-string[@class='style-scope ytd-menu-service-item-renderer']"
-    OPEN_OPTIONS_BUTTON ="//ytd-menu-renderer[@class='style-scope ytd-video-primary-info-renderer']/yt-icon-button[@id='button' and @class='dropdown-trigger style-scope ytd-menu-renderer' and 1]/button[@id='button' and @class='style-scope yt-icon-button' and 1]/yt-icon[@class='style-scope ytd-menu-renderer' and 1]"
+    class TRANSCRIPT:
+        TIMESTAMP="//div[@class='cue-group style-scope ytd-transcript-body-renderer']/div[@class='cue-group-start-offset style-scope ytd-transcript-body-renderer' and 1]"
+        TRANSCRIPT ="//div[@class='cue style-scope ytd-transcript-body-renderer']"
+        OPEN_TRANSCRIPT_BUTTON="//yt-formatted-string[@class='style-scope ytd-menu-service-item-renderer']"
+        OPEN_OPTIONS_BUTTON ="//ytd-menu-renderer[@class='style-scope ytd-video-primary-info-renderer']/yt-icon-button[@id='button' and @class='dropdown-trigger style-scope ytd-menu-renderer' and 1]/button[@id='button' and @class='style-scope yt-icon-button' and 1]/yt-icon[@class='style-scope ytd-menu-renderer' and 1]"
+    class COMMENTS:
+        NUMBER_COMMENTS="//yt-formatted-string[@class='count-text style-scope ytd-comments-header-renderer']"
+        COMMENT_BLOCK="//div[@id='main' and @class='style-scope ytd-comment-renderer']"
+        VIEW_REPLIES_BUTTON="//yt-formatted-string[@id='text' and @class='style-scope ytd-button-renderer']"
+        
 class CSV_COLS():
     LIKES="LIKES"
     DISLIKES="DISLIKES"
@@ -191,16 +203,18 @@ class youtube_crawler(WebDriver):
     
     def make_html(self, out_dict):
         self.__df__.to_html('temp.html')
-        
-    def get_video_transcript(self, youtube_url):
+    
+    def get(self, youtube_url):
         self.driver.get(youtube_url)
+    
+    def get_video_transcript(self, youtube_url):
         self.driver.click(
         CONSTANTS.SKIP_ADD_BUTTON,
         CONSTANTS.SHOW_MORE,
-        X_PATH_CONSTANTS.OPEN_OPTIONS_BUTTON,
-        X_PATH_CONSTANTS.OPEN_TRANSCRIPT_BUTTON)
+        X_PATH_CONSTANTS.TRANSCRIPT.OPEN_OPTIONS_BUTTON,
+        X_PATH_CONSTANTS.TRANSCRIPT.OPEN_TRANSCRIPT_BUTTON)
         
-        transcript = self.driver.get_multiple_elements(X_PATH_CONSTANTS.TRANSCRIPT)
+        transcript = self.driver.get_multiple_elements(X_PATH_CONSTANTS.TRANSCRIPT.TRANSCRIPT)
         transcript = self.process_transcript(transcript)
         
         likes = self.driver.get_element_text(CONSTANTS.NUMBER_LIKES)
@@ -223,7 +237,6 @@ class youtube_crawler(WebDriver):
         self.make_csv()
 
     def get_list_of_videos_on_channel(self, youtube_url):
-        self.driver.get(youtube_url)
         self.driver.scroll()
         videos = self.driver.find_elements_by_tag_name('a')
         list_of_videos =[]
@@ -235,6 +248,7 @@ class youtube_crawler(WebDriver):
         joined_list=[]
         for video_url in list_of_videos:
             try:
+                self.get(video_url)
                 self.get_video_transcript(video_url)
             except KeyboardInterrupt:
                 print("stopped due to keyboard interrupt")
@@ -243,12 +257,10 @@ class youtube_crawler(WebDriver):
                 return
 
     def get_channel_sub_count(self, youtube_url):
-        self.driver.get(youtube_url)
         subs = self.driver.find_element_by_xpath(CONSTANTS.SUBSCRIBERS)
         return subs
 
     def get_video_view_count(self, youtube_url):
-        self.driver.get(youtube_url)
         views = self.driver.find_element_by_xpath(CONSTANTS.VIEWS)
         processed= views.text
         processed = processed.replace('views', '')
@@ -256,8 +268,59 @@ class youtube_crawler(WebDriver):
 
     def get_recent_videos_from_query(self, query):
         url = f"https://www.youtube.com/results?search_query={query}&sp=CAI%253D"
-        self.driver.get(url)
+        self.get(url)
         self.driver.scroll()
         dict= self.get_recent_video_links(self.driver)
         return dict
+    
+    def convert_comment(self, comment):
+        comment_block=comment.split('\n')
         
+        username = comment_block[0]
+        time_posted = comment_block[1]
+        comment_text = comment_block[2]
+        
+        try:
+            number_likes=comment_block[4]
+        except:
+            number_likes=0
+        converted ={'username':username,
+                    'time_posted':time_posted,
+                    'comment_text':comment_text,
+                    'number_likes':number_likes
+        }
+        return converted
+      
+    def get_all_comments_from_video(self):
+        
+        total_comments = self.driver.get_element_text(X_PATH_CONSTANTS.COMMENTS.NUMBER_COMMENTS)
+        
+        #parse the string
+        total_comments=total_comments.split(' ')
+        total_comments=int(total_comments[0].replace(',',''))
+        
+        number_comments_shown = len(self.driver.get_multiple_elements(X_PATH_CONSTANTS.COMMENTS.COMMENT_BLOCK))
+        
+        #we need to keep scrolling until all of the comments are lazy loaded in. 
+        while total_comments != number_comments_shown:
+            number_comments_shown = len(self.driver.get_multiple_elements(X_PATH_CONSTANTS.COMMENTS.COMMENT_BLOCK))        #now we can collect the information
+            old_position = self.driver.get_screen_position()
+            self.driver.single_scroll()
+            time.sleep(1.2)
+            new_position = self.driver.get_screen_position()
+            #youtube will not lazy-load anymore comments
+            if new_position == old_position:
+                break
+        comment_blocks=self.driver.get_multiple_elements(X_PATH_CONSTANTS.COMMENTS.COMMENT_BLOCK)
+        #the comment block contains the username, comment, and number of likes/dislikes seperated by '\n'
+        
+        #this line takes a while
+        parsed_comment_blocks=list(map(lambda x:x.text, comment_blocks))
+        #convert the single dimension list to a list of comment dictionaries
+        parsed_comment_blocks = list(map(lambda comment:self.convert_comment(comment), parsed_comment_blocks))
+        return parsed_comment_blocks
+wb = WebDriver()
+yt = youtube_crawler(wb)
+yt.get('https://www.youtube.com/watch?v=SVQgEcPVIyY')
+yt.get_all_comments_from_video()          
+del yt
