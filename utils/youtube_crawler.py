@@ -3,33 +3,45 @@ from selenium import webdriver
 from selenium.webdriver.common.keys import Keys
 import time
 import pandas as pd
+import re
 class WebDriver():
     def __init__(self):
         self.driver =  webdriver.Firefox()
+        self.current_url = ""
     
     def __del__(self):
         self.driver.close()
 
     def get(self, url):
+        self.current_url = url
         self.driver.get(url)
     
-    def get_element(self, elem):
-        self.wait_for_elem_load(elem)
+    def get_element(self, elem, findByID=False):
+        self.wait_for_elem_load(elem, findByID)
         try:
-            return self.driver.find_element_by_xpath(elem)
+            if findByID:
+                return self.driver.find_element_by_id(elem)
+            else:
+                return self.driver.find_element_by_xpath(elem)
         except:
             return {'text':'None'}
     
-    def get_multiple_elements(self, elem):
-        self.wait_for_elem_load(elem)
+    
+    def get_multiple_elements(self, elem, findByID=False):
+        self.wait_for_elem_load(elem, findByID)
+        if findByID:
+            return self.driver.find_elements_by_id(elem)
         return self.driver.find_elements_by_xpath(elem)
     
-    def wait_for_elem_load(self, elem):
+    def wait_for_elem_load(self, elem, findByID=False):
         loaded = False
         counter= 0
         while not loaded:
             try:
-                self.driver.find_element_by_xpath(elem)
+                if findByID:
+                    self.driver.find_element_by_id(elem)
+                else:
+                    self.driver.find_element_by_xpath(elem)
                 loaded= True
             except:
                 #the element is not on the page yet
@@ -37,7 +49,8 @@ class WebDriver():
                 #the element may be lazy loaded in, so we scroll to trigger it.
                 self.single_scroll()
             counter+=1
-            if(counter > 50): 
+            #allow up to 5 seconds for the element to load
+            if(counter > 25): 
                break
     
     def get_element_text(self, elem):
@@ -75,15 +88,13 @@ class WebDriver():
         old_position = 0
         new_position = None
         num_scrolls=0
+        
         while new_position != old_position:
-            # Get old scroll position
             old_position = self.get_screen_position()
-            # Sleep and Scroll
             time.sleep(1.2)
-            self.single_scroll()
-            # Get new position
             new_position = self.get_screen_position()
             num_scrolls+=1
+            self.single_scroll()
             if num_scrolls==max_num_scrolls:
                 break
     
@@ -148,23 +159,25 @@ class youtube_crawler(WebDriver):
     TRANSCRIPT="TRANSCRIPT"
 
     def __init__(self, webdriver):
-        self.__word_list=[]
-        self.__df__=pd.DataFrame(columns=[CSV_COLS.URL,CSV_COLS.TITLE, CSV_COLS.DESCRIPTION, CSV_COLS.LIKES, CSV_COLS.DISLIKES, CSV_COLS.VIEWS, CSV_COLS.UPLOAD_DATE, CSV_COLS.DURATION, 
+        self.__word_list = []
+        self.__df__ = pd.DataFrame(columns=[CSV_COLS.URL,CSV_COLS.TITLE, CSV_COLS.DESCRIPTION, CSV_COLS.LIKES, CSV_COLS.DISLIKES, CSV_COLS.VIEWS, CSV_COLS.UPLOAD_DATE, CSV_COLS.DURATION, 
                                           CSV_COLS.NUM_COMMENTS, CSV_COLS.CHANNEL_NAME, CSV_COLS.CHANNEL_SUBS, CSV_COLS.URL, CSV_COLS.TRANSCRIPT])
         
-        self.driver=webdriver
+        self.driver = webdriver
+        self.url = None
 
     def __del__(self):
+        self.url=None
         self.driver.close()
 
-    def get_video_links(self, driver):
+    def get_video_links(self):
         videos = self.driver.find_elements_by_tag_name('a')
         list_of_videos =[]
-        for e in videos:
-            a = e.get_attribute('href')
-            if(a !=None and "redirect" not in a):
-                if("watch" in a and a not in list_of_videos):
-                    list_of_videos.append(a)
+        for video in videos:
+            link = video.get_attribute('href')
+            if(link !=None and "redirect" not in link):
+                if("watch" in link and link not in list_of_videos):
+                    list_of_videos.append(link)
         return list_of_videos
 
     def upload_time_is_recent(self, upload_time):
@@ -177,8 +190,8 @@ class youtube_crawler(WebDriver):
                 return False
         return True    
 
-    def get_recent_video_links(self, driver):
-        videos = self.driver.find_elements_by_id('video-title')
+    def get_recent_video_links(self):
+        videos = self.driver.get_multiple_elements('video-title',findByID=True )
         list_of_videos ={'links':[],'upload_times':[]}
         for e in videos:
             link = e.get_attribute('href')
@@ -198,16 +211,21 @@ class youtube_crawler(WebDriver):
     def append_df(self, out_dict):
         self.__df__=self.__df__.append(out_dict, ignore_index=True)
 
-    def make_csv(self):
-        self.__df__.to_csv('output.csv')
+    def make_csv(self,filename="output.csv"):
+        self.__df__.to_csv(filename)
     
-    def make_html(self, out_dict):
-        self.__df__.to_html('temp.html')
+    def make_html(self, filename="output.html"):
+        self.__df__.to_html(filename)
+    
+    def make_txt(self, filename="output.txt", words=[]):
+        with open("words.txt", "a") as output:
+            output.write(str(words))
     
     def get(self, youtube_url):
+        self.url=youtube_url
         self.driver.get(youtube_url)
     
-    def get_video_transcript(self, youtube_url):
+    def get_video_transcript(self):
         self.driver.click(
         CONSTANTS.SKIP_ADD_BUTTON,
         CONSTANTS.SHOW_MORE,
@@ -229,18 +247,18 @@ class youtube_crawler(WebDriver):
         channel_subs =self.driver.get_element_text(CONSTANTS.CHANNEL_SUBS)
         #timestamp = self.driver.get_element_text(X_PATH_CONSTANTS.TIMESTAMP)
         
-        out_dict={CSV_COLS.URL:youtube_url, CSV_COLS.TITLE: title,CSV_COLS.DESCRIPTION:description,  CSV_COLS.LIKES:likes, CSV_COLS.DISLIKES:dislikes, CSV_COLS.VIEWS:views,
+        out_dict={CSV_COLS.URL:self.url, CSV_COLS.TITLE: title,CSV_COLS.DESCRIPTION:description,  CSV_COLS.LIKES:likes, CSV_COLS.DISLIKES:dislikes, CSV_COLS.VIEWS:views,
                 CSV_COLS.UPLOAD_DATE:upload_date, CSV_COLS.DURATION:duration, CSV_COLS.NUM_COMMENTS:num_comments, 
-                CSV_COLS.CHANNEL_NAME:channel_name, CSV_COLS.CHANNEL_SUBS:channel_subs, CSV_COLS.URL:youtube_url, CSV_COLS.TRANSCRIPT:total_trans}
+                CSV_COLS.CHANNEL_NAME:channel_name, CSV_COLS.CHANNEL_SUBS:channel_subs, CSV_COLS.URL:self.url, CSV_COLS.TRANSCRIPT:transcript}
         
         self.append_df(out_dict)
-        self.make_csv()
+        # self.make_csv()
 
-    def get_list_of_videos_on_channel(self, youtube_url):
+    def get_list_of_videos_on_channel(self):
         self.driver.scroll()
         videos = self.driver.find_elements_by_tag_name('a')
         list_of_videos =[]
-        list_of_videos=self.get_video_links(driver)
+        list_of_videos=self.get_video_links()
         return list_of_videos
         
     def get_all_video_transcripts_from_channel(self, youtube_url):
@@ -249,28 +267,28 @@ class youtube_crawler(WebDriver):
         for video_url in list_of_videos:
             try:
                 self.get(video_url)
-                self.get_video_transcript(video_url)
+                self.get_video_transcript()
             except KeyboardInterrupt:
                 print("stopped due to keyboard interrupt")
-                with open("words.txt", "a") as output:
-                    output.write(str(joined_list))
                 return
 
-    def get_channel_sub_count(self, youtube_url):
-        subs = self.driver.find_element_by_xpath(CONSTANTS.SUBSCRIBERS)
+    def get_channel_sub_count(self):
+        subs = self.driver.get_element_text(CONSTANTS.SUBSCRIBERS)
         return subs
 
-    def get_video_view_count(self, youtube_url):
-        views = self.driver.find_element_by_xpath(CONSTANTS.VIEWS)
-        processed= views.text
-        processed = processed.replace('views', '')
+    def get_video_view_count(self):
+        views = self.driver.get_element_text(CONSTANTS.VIEWS)
+        processed = views.replace('views', '')
+        processed = processed.replace(',', '')
+        processed = int(processed)
+        
         return processed
 
     def get_recent_videos_from_query(self, query):
         url = f"https://www.youtube.com/results?search_query={query}&sp=CAI%253D"
         self.get(url)
         self.driver.scroll()
-        dict= self.get_recent_video_links(self.driver)
+        dict= self.get_recent_video_links()
         return dict
     
     def convert_comment(self, comment):
@@ -281,23 +299,26 @@ class youtube_crawler(WebDriver):
         comment_text = comment_block[2]
         
         try:
-            number_likes=comment_block[4]
+            number_likes=comment_block[3]
         except:
             number_likes=0
+
         converted ={'username':username,
                     'time_posted':time_posted,
                     'comment_text':comment_text,
                     'number_likes':number_likes
-        }
+                    }
         return converted
-      
+    
     def get_all_comments_from_video(self):
         
         total_comments = self.driver.get_element_text(X_PATH_CONSTANTS.COMMENTS.NUMBER_COMMENTS)
         
         #parse the string
-        total_comments=total_comments.split(' ')
-        total_comments=int(total_comments[0].replace(',',''))
+        total_comments=total_comments.replace(' Comments','')
+        if "," in total_comments:
+            total_comments=int(total_comments.replace(',',''))
+        total_comments = int(total_comments)
         
         number_comments_shown = len(self.driver.get_multiple_elements(X_PATH_CONSTANTS.COMMENTS.COMMENT_BLOCK))
         
@@ -319,8 +340,4 @@ class youtube_crawler(WebDriver):
         #convert the single dimension list to a list of comment dictionaries
         parsed_comment_blocks = list(map(lambda comment:self.convert_comment(comment), parsed_comment_blocks))
         return parsed_comment_blocks
-# wb = WebDriver()
-# yt = youtube_crawler(wb)
-# yt.get('https://www.youtube.com/watch?v=SVQgEcPVIyY')
-# yt.get_all_comments_from_video()          
-# del yt
+    
