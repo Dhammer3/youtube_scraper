@@ -19,13 +19,11 @@ class TestYoutubeCrawler(unittest.TestCase):
     def tearDown(self):
         del self.yt
     
-    @unittest.skip("demonstrating skipping")   
     def test_get(self):
         url = self.video_url
         self.yt.get(url)
         assert self.yt.url == url
     
-    @unittest.skip("demonstrating skipping")
     def test_get_video_transcript(self):
         url = self.video_url
         self.yt.get(url)
@@ -34,14 +32,12 @@ class TestYoutubeCrawler(unittest.TestCase):
         rows = df.iloc[:]
         assert len(rows) != 0
 
-    @unittest.skip("demonstrating skipping")
     def test_get_list_of_videos_on_channel(self):
         url = self.channel_url
         self.yt.get(url)
         channel_videos = self.yt.get_list_of_videos_on_channel()
         assert(len(channel_videos)!= 0)
     
-    @unittest.skip("demonstrating skipping")
     def test_get_channel_sub_count(self):
         url = self.channel_url
         self.yt.get(url)
@@ -49,7 +45,6 @@ class TestYoutubeCrawler(unittest.TestCase):
         subs = self.yt.get_channel_sub_count()
         assert(subs != None)
         
-    @unittest.skip("demonstrating skipping")
     def test_get_video_view_count(self):
         url = self.video_url
         self.yt.get(url)
@@ -57,17 +52,14 @@ class TestYoutubeCrawler(unittest.TestCase):
         views = self.yt.get_video_view_count()
         assert(type(views)==int)
         
-    @unittest.skip("demonstrating skipping")
     def test_get_recent_videos_from_query(self):
         search_dict = self.yt.get_recent_videos_from_query('iceberg')
         assert(search_dict != {})
         
-    # @unittest.skip("demonstrating skipping")
+    # @unittest.skip("skipping")
     def test_get_all_comments_from_video(self):
-        import time
         url = self.video_url
         self.yt.get(url)
-        time.sleep(1)
         comments={}
         comments = self.yt.get_all_comments_from_video()
         assert(comments!={})
