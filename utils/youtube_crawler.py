@@ -319,8 +319,8 @@ class youtube_crawler(WebDriver):
         #convert the single dimension list to a list of comment dictionaries
         parsed_comment_blocks = list(map(lambda comment:self.convert_comment(comment), parsed_comment_blocks))
         return parsed_comment_blocks
-wb = WebDriver()
-yt = youtube_crawler(wb)
-yt.get('https://www.youtube.com/watch?v=SVQgEcPVIyY')
-yt.get_all_comments_from_video()          
-del yt
+# wb = WebDriver()
+# yt = youtube_crawler(wb)
+# yt.get('https://www.youtube.com/watch?v=SVQgEcPVIyY')
+# yt.get_all_comments_from_video()          
+# del yt
