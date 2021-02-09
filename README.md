@@ -1,4 +1,4 @@
-# An easy to use Youtube Scraper
+# An Easy to use Youtube Scraper
 
 ## Some Key Features Include:
 * Collect Information on individual videos:
